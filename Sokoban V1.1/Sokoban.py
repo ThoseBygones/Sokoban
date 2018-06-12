@@ -41,30 +41,8 @@ class Button(object):
         else:
             screen.blit(self.buttonUp, (x-w/2, y-h/2))
 
-def toBox(level, index):
-    if level[index] == '.' or level[index] == '@':
-        level[index] = '$'
-    else:
-        level[index] = '&'
-
-def toMan(level, i):
-    if level[i] == '.' or level[i] == '$':
-        level[i]='@'
-    else:
-        level[i]='+'
-
-def toFloor(level, i):
-    if level[i] == '@' or level[i] == '$':
-        level[i]='.'
-    else:
-        level[i]='*'
-
-def offset(d, width):
-    d4 = [-1, -width, 1, width]
-    m4 = ['l','u','r','d']
-    return d4[m4.index(d.lower())]
-
 class Sokoban:
+    
     def __init__(self):
         self.level = list('....#####..........'+\
                           '....#...#..........'+\
@@ -80,6 +58,30 @@ class Sokoban:
         self.w = 19
         self.h = 11
         self.man = 163 #8行，11列（9=163 // 19 12=163 mod 19）
+        self.boxInPositionCnt = 0
+        
+    def toBox(self, level, index):
+        if level[index] == '.' or level[index] == '@':
+            level[index] = '$'
+        else:
+            level[index] = '&'
+
+    def toMan(self, level, i):
+        if level[i] == '.' or level[i] == '$':
+            level[i]='@'
+        else:
+            level[i]='+'
+    
+    def toFloor(self, level, i):
+        if level[i] == '@' or level[i] == '$':
+            level[i]='.'
+        else:
+            level[i]='*'
+    
+    def offset(self, d, width):
+        d4 = [-1, -width, 1, width]
+        m4 = ['l','u','r','d']
+        return d4[m4.index(d.lower())]
     
     def draw(self, screen, skin):
         w = skin.get_width() / 4
@@ -100,24 +102,32 @@ class Sokoban:
                 elif self.level[j*self.w + i] == '&':
                     screen.blit(skin, (i*w, j*w), (2*w,w,w,w))
     
-    # 移动函数
+    #def move(self, d):
+    #    self._move(d)
+    
     # 返回1表示推了箱子的移动，返回0表示没推箱子的移动，返回-1表示移动不成功
     def move(self, op):
         #print("方向：" + op)
-        h = offset(op, self.w)
+        h = self.offset(op, self.w)
         if self.level[self.man + h] == '.' or self.level[self.man + h] == '*':
             # move
-            toMan(self.level, self.man + h)
-            toFloor(self.level, self.man)
+            self.toMan(self.level, self.man + h)
+            self.toFloor(self.level, self.man)
             self.man += h
             return 0
         elif self.level[self.man + h] == '&' or self.level[self.man + h] == '$':
             if self.level[self.man + 2 * h] == '.' or self.level[self.man + 2 * h] == '*':
                 # push
-                toBox(self.level, self.man + 2 * h)
-                toMan(self.level, self.man + h)
-                toFloor(self.level, self.man)
+                if self.level[self.man + h] == '&':
+                    self.boxInPositionCnt -= 1
+                    #print(self.boxInPositionCnt)
+                self.toBox(self.level, self.man + 2 * h)
+                self.toMan(self.level, self.man + h)
+                self.toFloor(self.level, self.man)
                 self.man += h
+                if self.level[self.man + h] == '&':
+                    self.boxInPositionCnt += 1
+                    #print(self.boxInPositionCnt)
                 return 1
             else:
                 return -1
@@ -129,17 +139,23 @@ class Sokoban:
         d = op[0]
         flag = op[1]
         #print(flag)
-        h = offset(d, self.w)
+        h = self.offset(d, self.w)
         if flag == 1:
             # push
-            toBox(self.level, self.man)
-            toMan(self.level, self.man - h)
-            toFloor(self.level, self.man + h)
+            if self.level[self.man + h] == '&':
+                self.boxInPositionCnt -= 1
+                #print(self.boxInPositionCnt)
+            self.toBox(self.level, self.man)
+            self.toMan(self.level, self.man - h)
+            self.toFloor(self.level, self.man + h)
             self.man -= h
+            if self.level[self.man + h] == '&':
+                self.boxInPositionCnt += 1
+                #print(self.boxInPositionCnt)
         elif flag == 0:
             # move
-            toMan(self.level, self.man - h)
-            toFloor(self.level, self.man)
+            self.toMan(self.level, self.man - h)
+            self.toFloor(self.level, self.man)
             self.man -= h
 
 # 显示游戏主界面的函数
@@ -158,6 +174,18 @@ def showGameInterface(screen, interface, startGame, gameTips):
     gameTips.show(screen)
     return 0
 
+def showWinInterface(screen, interface, returnInterface):
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == MOUSEBUTTONDOWN:
+            if returnInterface.inButtonRange():
+                return 1
+    screen.blit(interface, (0,0))
+    returnInterface.show(screen)
+    return 0
+
 def main():
     # 初始化pygame
     pygame.init()
@@ -173,10 +201,14 @@ def main():
     button1 = Button('GameStartButtonUp.png', 'GameStartButtonDown.png', (200,300))
     # “游戏说明”按钮
     button2 = Button('GameTipsButtonUp.png', 'GameTipsButtonDown.png', (200,350))
+    # “返回主界面”按钮
+    button3 = Button('ReturnInterfaceUp.png', 'ReturnInterfaceDown.png', (200,350))
     # 主界面背景图片
     interface = pygame.image.load("Interface.png")
     # 游戏说明界面图片
     gametips = pygame.image.load("GameTips.png")
+    # 通关提示界面图片
+    chapterpass = pygame.image.load("ChapterPass.png")
     # 加载游戏界面图片资源
     skinfilename = os.path.join('borgar.png')
     try:
@@ -211,7 +243,7 @@ def main():
             # main game loop
             while True:
                 # 给tick方法加上的参数就成为了游戏绘制的最大帧率
-                retInterface = False
+                retGameInterface = False
                 clock.tick(60)
                 for event in pygame.event.get():
                     if event.type == QUIT:
@@ -220,7 +252,7 @@ def main():
                         sys.exit()
                     elif event.type == KEYDOWN:
                         if event.key == K_ESCAPE:
-                            retInterface = True
+                            retGameInterface = True
                             break
                         elif event.key == K_LEFT:
                             flag = skb.move('l')
@@ -249,13 +281,18 @@ def main():
                 #screen.blit(interface,(0,0))
                 #button1.show(screen)
                 #button2.show(screen)
+                if skb.boxInPositionCnt == 6:
+                    clock.tick(60)
+                    win = showWinInterface(screen, chapterpass, button3)
+                    if win == 1:
+                        retGameInterface = True
                 pygame.display.update()
-                if retInterface == True:
+                if retGameInterface == True:
                     pygame.mixer.music.stop()
                     break
         elif flag == 2:
             clock.tick(60)
-            retInterface = False
+            retGameInterface = False
             while True:
                 for event in pygame.event.get():
                     if event.type == QUIT:
@@ -263,11 +300,11 @@ def main():
                         sys.exit()
                     elif event.type == KEYDOWN:
                         if event.key == K_ESCAPE:
-                            retInterface = True
+                            retGameInterface = True
                             break
                 screen.blit(gametips, (0,0))
                 pygame.display.update()
-                if retInterface == True:
+                if retGameInterface == True:
                     break
         pygame.display.update()
 
