@@ -81,7 +81,7 @@ class Sokoban:
         self.w = [10, 12, 19]
         self.h = [11, 11, 11]
         self.man = [92, 117, 163] #8行，11列（9=163 // 19 12=163 mod 19）
-        self.boxInPositionCnt = [3, 4, 5]
+        self.boxInPositionCnt = [0, 0, 0]
         self.boxCnt = [4, 5, 6]
         
     def toBox(self, chapter, index):
